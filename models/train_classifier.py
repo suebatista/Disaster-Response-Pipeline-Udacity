@@ -18,12 +18,17 @@ def load_data(database_filepath):
     df = pd.read_sql("SELECT * FROM RawDataClean", engine)
     engine.dispose()
 
+    # set labels in the 'related' category from 2 to 0
+    # correcting these mislabels is vital for the ML pipeline processing
+    df.loc[df['related'] > 1,'related'] = 0
+
     categories = df.drop(columns = ['id', 'message', 'original', 'genre'])
-    X, Y, category_names = df[['message', 'genre']], categories.to_numpy(), categories.columns.values
+    X, Y, category_names = df[['message','genre']], categories.to_numpy(), categories.columns.values
 
     return X, Y, category_names
 
 
+# load NLP related modules and files
 import nltk
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
@@ -87,6 +92,9 @@ def build_model():
         ('pre_proc', column_trans),
         ('clf', OneVsRestClassifier(base_lr)),
         ])
+    # pipe = Pipeline([
+    # ('tfidf_vect', TfidfVectorizer(tokenizer = tokenize)),
+    # ('clf', OneVsRestClassifier(base_lr))])
 
     return pipe
 
@@ -109,17 +117,15 @@ def evaluate_model(model, X_test, Y_test, category_names):
     # calculate jaccard_score, which is a good measure for the multilabel classification problem
     ovr_jaccard_score = jaccard_score(Y_test, y_pred, average='samples')
    
-    target_names = category_names
-    report = classification_report(Y_test, y_pred, target_names = target_names, output_dict=True)
+    report = classification_report(Y_test, y_pred, target_names=category_names, output_dict=True, zero_division=0)
     # convert the report to pandas DataFrame
     report = pd.DataFrame(report).transpose()
     # save the evaluation metrics to the csv file
-    report.to_csv('/data/performance_evaluation.csv')
+    report.to_csv('data/performance_evaluation.csv')
 
     return ovr_jaccard_score
 
     
-
 
 def save_model(model, model_filepath):
     '''
@@ -134,6 +140,10 @@ def save_model(model, model_filepath):
         pickle.dump(model, f)
 
     
+# def warn(*args, **kwargs):
+#     pass
+# import warnings
+# warnings.warn = warn
 
 
 def main():
