@@ -48,7 +48,7 @@ def clean_data(df):
 
     return df
 
-def save_data(df, database_filename):
+def save_data(df, database_filepath):
     '''
     INPUT
     cleaned dataframe and the filepath for the SQL database for saving the dataframe
@@ -56,9 +56,9 @@ def save_data(df, database_filename):
     OUTPUT
     None
     '''
-    from sqlalchemy import create_engine
-    engine = create_engine('sqlite:///Raw_data_clean.db')
-    df.to_sql('RawData', engine, if_exists = 'replace', index=False) 
+    from sqlalchemy import create_engine   
+    engine = create_engine('sqlite:///{fname}.db'.format(fname = database_filepath))
+    df.to_sql('RawDataClean', engine, if_exists = 'replace', index=False) 
     engine.dispose()
 
 
