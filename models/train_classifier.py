@@ -14,7 +14,7 @@ def load_data(database_filepath):
     category_names: names of the labels
     '''
     from sqlalchemy import create_engine
-    engine = create_engine('sqlite:///{fname}.db'.format(fname = database_filepath))
+    engine = create_engine('sqlite:///{}'.format(database_filepath))
     df = pd.read_sql("SELECT * FROM RawDataClean", engine)
     engine.dispose()
 

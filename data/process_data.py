@@ -57,7 +57,7 @@ def save_data(df, database_filepath):
     None
     '''
     from sqlalchemy import create_engine   
-    engine = create_engine('sqlite:///{fname}.db'.format(fname = database_filepath))
+    engine = create_engine('sqlite:///{}'.format(database_filepath))
     df.to_sql('RawDataClean', engine, if_exists = 'replace', index=False) 
     engine.dispose()
 
