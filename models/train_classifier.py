@@ -21,8 +21,11 @@ def load_data(database_filepath):
     # set labels in the 'related' category from 2 to 0
     # correcting these mislabels is vital for the ML pipeline processing
     df.loc[df['related'] > 1,'related'] = 0
-
+    
+    # drop this column with all the labels are 0
+    df = df.drop(columns = 'child_alone')
     categories = df.drop(columns = ['id', 'message', 'original', 'genre'])
+
     X, Y, category_names = df[['message','genre']], categories.to_numpy(), categories.columns.values
 
     return X, Y, category_names
@@ -86,7 +89,7 @@ def build_model():
      ('message_tfidf', TfidfVectorizer(tokenizer = tokenize), 'message')])
 
     # build pipeline
-    base_lr = LogisticRegression() 
+    base_lr = LogisticRegression(max_iter=500) 
     # we use one_vs_rest method to deal with multilabel problem
     pipe = Pipeline([
         ('pre_proc', column_trans),
