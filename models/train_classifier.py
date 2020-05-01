@@ -77,8 +77,8 @@ def build_model():
 
     # use one-hot encoding for 'genre' column
     column_trans = ColumnTransformer(
-        [('genre_categroy', OneHotEncoder(dtype='int'),['genre']),
-        ('message_tfidf', TfidfVectorizer(tokenizer = tokenize), 'message')])
+    [('genre_categroy', OneHotEncoder(dtype='int'),['genre']),
+     ('message_tfidf', TfidfVectorizer(tokenizer = tokenize), 'message')])
 
     # build pipeline
     base_lr = LogisticRegression() 
