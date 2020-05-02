@@ -45,6 +45,13 @@ def clean_data(df):
 
     # remove duplicated rows
     df = df.drop_duplicates(subset = 'id')
+    
+    # set labels in the 'related' category from 2 to 0
+    # correcting these mislabels is vital for the ML pipeline processing
+    df.loc[df['related'] > 1,'related'] = 0
+
+    # drop this column with all the labels are 0
+    df = df.drop(columns = 'child_alone')
 
     return df
 
