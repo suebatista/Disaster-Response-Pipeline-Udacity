@@ -6,9 +6,7 @@ from sklearn.model_selection import train_test_split
 
 
 class ML_classifier():
-    '''
-    This Recommender uses FunkSVD to make predictions of exact ratings.  And uses either FunkSVD or a Knowledge Based recommendation (highest ranked) to make recommendations for users.  Finally, if given a movie, the recommender will provide movies that are most similar as a Content Based Recommender.
-    '''
+    
     def __init__(self):
         self.clf = LogisticRegression(max_iter=500) # default classifier
 
@@ -48,6 +46,12 @@ class sample_data():
     '''
     def __init__(self, df, threshold = 0.05):
         '''
+        INPUT: 
+        df: dataframe to be sampled
+        threshold: parameters for deciding the least popular message labels
+
+        OUTPUT:
+        None
         '''
         self.df = df
         self.threshold = threshold
@@ -59,6 +63,13 @@ class sample_data():
                     
     
     def simple_sample(self):
+        '''
+        INPUT:
+        None
+
+        OUTPUT:
+        dataframe upsampled using the simple strategy
+        '''
         msg_simple_sample = self.df[self.df[self.sparse_label].any(axis = 1)].sample(n = self.upsample_num, replace = True, random_state = 0)
         df_simple_sample = pd.concat([msg_simple_sample, self.df[~self.df[self.sparse_label].any(axis = 1)]])
         
@@ -66,6 +77,13 @@ class sample_data():
                      
         
     def up_sample(self):
+        '''
+        INPUT:
+        None
+
+        OUTPUT:
+        dataframe upsampled using the more sophiscated method
+        '''
         self.pop_label = list(self.sub_cats.sum().sort_values(ascending = False)[:3].index)        
         # messages without any label in those popular categories 
         sparse_msg = self.sub_cats[~self.sub_cats[self.pop_label].any(axis = 1)]
