@@ -21,7 +21,7 @@ def load_data(database_filepath):
     # set labels in the 'related' category from 2 to 0
     # correcting these mislabels is vital for the ML pipeline processing
     df.loc[df['related'] > 1,'related'] = 0
-    
+
     # drop this column with all the labels are 0
     df = df.drop(columns = 'child_alone')
     categories = df.drop(columns = ['id', 'message', 'original', 'genre'])
@@ -138,9 +138,11 @@ def save_model(model, model_filepath):
     OUTPUT
     None
     '''
-    import pickle
-    with open(model_filepath, 'wb') as f:
-        pickle.dump(model, f)
+    # import pickle
+    # with open(model_filepath, 'wb') as f:
+    #     pickle.dump(model, f)
+    from joblib import dump
+    dump(model, '{}'.format(model_filepath)) 
 
     
 # def warn(*args, **kwargs):
