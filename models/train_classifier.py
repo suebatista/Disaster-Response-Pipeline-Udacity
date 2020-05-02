@@ -3,6 +3,82 @@ import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
 
+
+
+class ML_classifier():
+    '''
+    This Recommender uses FunkSVD to make predictions of exact ratings.  And uses either FunkSVD or a Knowledge Based recommendation (highest ranked) to make recommendations for users.  Finally, if given a movie, the recommender will provide movies that are most similar as a Content Based Recommender.
+    '''
+    def __init__(self):
+        self.clf = LogisticRegression(max_iter=500) # default classifier
+
+    def load_data(self, df):
+        categories = df.drop(columns = ['id', 'message', 'original', 'genre'])
+        x, y = df['message'].to_numpy(), categories.to_numpy()
+    
+        return train_test_split(x, y, test_size = 0.3, shuffle = True, random_state=0)
+
+    def build_model(self, clf):
+        # build pipeline
+        self.clf = clf
+        self.pipe = Pipeline([
+        ('tfidf_vect', TfidfVectorizer(tokenizer = tokenize)),
+        ('clf', OneVsRestClassifier(self.clf))])
+
+        return self.pipe
+
+    def evalute(self, df):        
+        x_train, x_test, y_train, y_test = self.load_data(df)
+        model = self.build_model()
+        model.fit(x_train, y_train)
+        self.y_pred = model.predict(x_test)
+        self.jaccard_score = jaccard_score(y_test, y_pred, average='samples')
+    
+        target_names = df.drop(columns = ['id', 'message', 'original', 'genre']).columns.values
+        report = classification_report(y_test, self.y_pred, target_names = target_names, output_dict=True, zero_division = 0)
+        self.report_df = pd.DataFrame(report).transpose()
+    
+        return self.jaccard_score
+
+
+class sample_data():
+    '''
+    This class provides two data up-sampling methods described in the jupyternotebook.
+    The up_sample method is better 
+    '''
+    def __init__(self, df, threshold = 0.05):
+        '''
+        '''
+        self.df = df
+        self.threshold = threshold
+        self.sub_cats = self.df[self.df['related'] == 1].drop(columns = ['id', 'message', 'original', 'genre', 'related'])
+        label_counts = self.sub_cats.sum().values
+        self.upsample_num = np.sort(label_counts)[::-1][0]
+        criteria = label_counts/self.df.shape[0] < self.threshold
+        self.sparse_label = list(self.sub_cats.columns[criteria])
+                    
+    
+    def simple_sample(self):
+        msg_simple_sample = self.df[self.df[self.sparse_label].any(axis = 1)].sample(n = self.upsample_num, replace = True, random_state = 0)
+        df_simple_sample = pd.concat([msg_simple_sample, self.df[~self.df[self.sparse_label].any(axis = 1)]])
+        
+        return df_simple_sample
+                     
+        
+    def up_sample(self):
+        self.pop_label = list(self.sub_cats.sum().sort_values(ascending = False)[:3].index)        
+        # messages without any label in those popular categories 
+        sparse_msg = self.sub_cats[~self.sub_cats[self.pop_label].any(axis = 1)]
+        msg_to_sample = sparse_msg[(sparse_msg.sum(axis = 1) > 0)]
+        # upsampling 
+        msg_up_sample = msg_to_sample.sample(n = self.upsample_num, replace = True, random_state = 0)
+        df_sample = pd.concat([self.df.loc[msg_up_sample.index], self.df.loc[list(set(self.df.index.values) - set(msg_to_sample.index.values))]])
+        
+        return df_sample    
+        
+        
+        
+    
 def load_data(database_filepath):
     '''
     INPUT
@@ -84,11 +160,6 @@ def build_model():
 
     # build pipeline
     base_lr = LogisticRegression(max_iter=500) 
-    # we use one_vs_rest method to deal with multilabel problem
-    # pipe = Pipeline([
-    #     ('pre_proc', column_trans),
-    #     ('clf', OneVsRestClassifier(base_lr)),
-    #     ])
     pipe = Pipeline([
     ('tfidf_vect', TfidfVectorizer(tokenizer = tokenize)),
     ('clf', OneVsRestClassifier(base_lr))])
