@@ -20,7 +20,7 @@ def load_data(database_filepath):
 
     categories = df.drop(columns = ['id', 'message', 'original', 'genre'])
 
-    X, Y, category_names = df[['message','genre']], categories.to_numpy(), categories.columns.values
+    X, Y, category_names = df['message'].to_numpy(), categories.to_numpy(), categories.columns.values
 
     return X, Y, category_names
 
@@ -74,24 +74,24 @@ def build_model():
     from sklearn.multiclass import OneVsRestClassifier
     from sklearn.linear_model import LogisticRegression
     from sklearn.pipeline import Pipeline
-    from sklearn.compose import ColumnTransformer
-    from sklearn.preprocessing import OneHotEncoder
+    # from sklearn.compose import ColumnTransformer
+    # from sklearn.preprocessing import OneHotEncoder
 
     # use one-hot encoding for 'genre' column
-    column_trans = ColumnTransformer(
-    [('genre_categroy', OneHotEncoder(dtype='int'),['genre']),
-     ('message_tfidf', TfidfVectorizer(tokenizer = tokenize), 'message')])
+    # column_trans = ColumnTransformer(
+    # [('genre_categroy', OneHotEncoder(dtype='int'),['genre']),
+    #  ('message_tfidf', TfidfVectorizer(tokenizer = tokenize), 'message')])
 
     # build pipeline
     base_lr = LogisticRegression(max_iter=500) 
     # we use one_vs_rest method to deal with multilabel problem
-    pipe = Pipeline([
-        ('pre_proc', column_trans),
-        ('clf', OneVsRestClassifier(base_lr)),
-        ])
     # pipe = Pipeline([
-    # ('tfidf_vect', TfidfVectorizer(tokenizer = tokenize)),
-    # ('clf', OneVsRestClassifier(base_lr))])
+    #     ('pre_proc', column_trans),
+    #     ('clf', OneVsRestClassifier(base_lr)),
+    #     ])
+    pipe = Pipeline([
+    ('tfidf_vect', TfidfVectorizer(tokenizer = tokenize)),
+    ('clf', OneVsRestClassifier(base_lr))])
 
     return pipe
 
