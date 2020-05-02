@@ -8,7 +8,6 @@ from nltk.tokenize import word_tokenize
 from flask import Flask
 from flask import render_template, request, jsonify
 from plotly.graph_objs import Bar
-#from sklearn.externals import joblib
 from sqlalchemy import create_engine
 from joblib import load
 
@@ -43,10 +42,20 @@ def index():
     # TODO: Below is an example - modify to extract data for your own visuals
     genre_counts = df.groupby('genre').count()['message']
     genre_names = list(genre_counts.index)
+
+    # data for 2nd figure
+    categories = df.drop(columns = ['id', 'message', 'original', 'genre'])
+    label_cats = categories.columns.values
+    label_counts = categories.sum().values
+
+    # data for 3rd figure
+    rowsums = categories.sum(axis=1)
+    multilabel_counts = rowsums.value_counts().sort_index()
+    multi_labels, multi_label_counts = multilabel_counts.index, multilabel_counts.values
     
     # create visuals
-    # TODO: Below is an example - modify to create your own visuals
     graphs = [
+
         {
             'data': [
                 Bar(
@@ -64,7 +73,46 @@ def index():
                     'title': "Genre"
                 }
             }
-        }
+        },
+
+      {
+            'data': [
+                Bar(
+                    x=label_cats,
+                    y=label_counts
+                )
+            ],
+
+            'layout': {
+                'title': 'Distribution of Message Labels',
+                'yaxis': {
+                    'title': "Count"
+                },
+                'xaxis': {
+                    'title': "Message Label"
+                }
+            }
+        },
+    {
+     'data': [
+                Bar(
+                    x=multi_labels,
+                    y=multi_label_counts
+                )
+            ],
+
+            'layout': {
+                'title': 'How many labels for each messages?',
+                'yaxis': {
+                    'title': "Number of Messages"
+                },
+                'xaxis': {
+                    'title': "Number of labels"
+                }
+            }
+
+    }
+
     ]
     
     # encode plotly graphs in JSON
@@ -84,7 +132,7 @@ def go():
     # use model to predict classification for query
     classification_labels = model.predict([query])[0]
     classification_results = dict(zip(df.columns[4:], classification_labels))
-
+    
     # This will render the go.html Please see that file. 
     return render_template(
         'go.html',
