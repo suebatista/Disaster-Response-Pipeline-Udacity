@@ -1,123 +1,6 @@
 import sys
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split
-
-
-
-class ML_classifier():
-    
-    def __init__(self):
-        self.clf = LogisticRegression(max_iter=500) # default classifier
-
-    def load_data(self, df):
-        categories = df.drop(columns = ['id', 'message', 'original', 'genre'])
-        x, y = df['message'].to_numpy(), categories.to_numpy()
-    
-        return train_test_split(x, y, test_size = 0.3, shuffle = True, random_state=0)
-
-    def build_model(self, clf):
-        # build pipeline
-        self.clf = clf
-        self.pipe = Pipeline([
-        ('tfidf_vect', TfidfVectorizer(tokenizer = tokenize)),
-        ('clf', OneVsRestClassifier(self.clf))])
-
-        return self.pipe
-
-    def evalute(self, df):        
-        x_train, x_test, y_train, y_test = self.load_data(df)
-        model = self.build_model()
-        model.fit(x_train, y_train)
-        self.y_pred = model.predict(x_test)
-        self.jaccard_score = jaccard_score(y_test, y_pred, average='samples')
-    
-        target_names = df.drop(columns = ['id', 'message', 'original', 'genre']).columns.values
-        report = classification_report(y_test, self.y_pred, target_names = target_names, output_dict=True, zero_division = 0)
-        self.report_df = pd.DataFrame(report).transpose()
-    
-        return self.jaccard_score
-
-
-class sample_data():
-    '''
-    This class provides two data up-sampling methods described in the jupyternotebook.
-    The up_sample method is better 
-    '''
-    def __init__(self, df, threshold = 0.05):
-        '''
-        INPUT: 
-        df: dataframe to be sampled
-        threshold: parameters for deciding the least popular message labels
-
-        OUTPUT:
-        None
-        '''
-        self.df = df
-        self.threshold = threshold
-        self.sub_cats = self.df[self.df['related'] == 1].drop(columns = ['id', 'message', 'original', 'genre', 'related'])
-        label_counts = self.sub_cats.sum().values
-        self.upsample_num = np.sort(label_counts)[::-1][0]
-        criteria = label_counts/self.df.shape[0] < self.threshold
-        self.sparse_label = list(self.sub_cats.columns[criteria])
-                    
-    
-    def simple_sample(self):
-        '''
-        INPUT:
-        None
-
-        OUTPUT:
-        dataframe upsampled using the simple strategy
-        '''
-        msg_simple_sample = self.df[self.df[self.sparse_label].any(axis = 1)].sample(n = self.upsample_num, replace = True, random_state = 0)
-        df_simple_sample = pd.concat([msg_simple_sample, self.df[~self.df[self.sparse_label].any(axis = 1)]])
-        
-        return df_simple_sample
-                     
-        
-    def up_sample(self):
-        '''
-        INPUT:
-        None
-
-        OUTPUT:
-        dataframe upsampled using the more sophiscated method
-        '''
-        self.pop_label = list(self.sub_cats.sum().sort_values(ascending = False)[:3].index)        
-        # messages without any label in those popular categories 
-        sparse_msg = self.sub_cats[~self.sub_cats[self.pop_label].any(axis = 1)]
-        msg_to_sample = sparse_msg[(sparse_msg.sum(axis = 1) > 0)]
-        # upsampling 
-        msg_up_sample = msg_to_sample.sample(n = self.upsample_num, replace = True, random_state = 0)
-        df_sample = pd.concat([self.df.loc[msg_up_sample.index], self.df.loc[list(set(self.df.index.values) - set(msg_to_sample.index.values))]])
-        
-        return df_sample    
-        
-        
-        
-    
-def load_data(database_filepath):
-    '''
-    INPUT
-    file path of the database
-
-    OUTPUT
-    X: message and genre data (model input)
-    Y: labels of the message (target)
-    category_names: names of the labels
-    '''
-    from sqlalchemy import create_engine
-    engine = create_engine('sqlite:///{}'.format(database_filepath))
-    df = pd.read_sql("SELECT * FROM RawDataClean", engine)
-    engine.dispose()
-
-    categories = df.drop(columns = ['id', 'message', 'original', 'genre'])
-
-    X, Y, category_names = df['message'].to_numpy(), categories.to_numpy(), categories.columns.values
-
-    return X, Y, category_names
-
 
 # load NLP related modules and files
 import nltk
@@ -154,104 +37,234 @@ def tokenize(text):
 
     return tokens
 
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.multiclass import OneVsRestClassifier
+from sklearn.metrics import jaccard_score
+from sklearn.metrics import classification_report
+from joblib import dump
 
 
-def build_model():
-    '''
-    INPUT
-    None
+class ML_classifier():
 
-    OUTPUT
-    the pipeline for building the model
-    '''
-    from sklearn.feature_extraction.text import TfidfVectorizer
-    from sklearn.multiclass import OneVsRestClassifier
-    from sklearn.linear_model import LogisticRegression
-    from sklearn.pipeline import Pipeline
-    # from sklearn.compose import ColumnTransformer
-    # from sklearn.preprocessing import OneHotEncoder
-
-    # use one-hot encoding for 'genre' column
-    # column_trans = ColumnTransformer(
-    # [('genre_categroy', OneHotEncoder(dtype='int'),['genre']),
-    #  ('message_tfidf', TfidfVectorizer(tokenizer = tokenize), 'message')])
-
-    # build pipeline
-    base_lr = LogisticRegression(max_iter=500) 
-    pipe = Pipeline([
-    ('tfidf_vect', TfidfVectorizer(tokenizer = tokenize)),
-    ('clf', OneVsRestClassifier(base_lr))])
-
-    return pipe
+    def __init__(self, df):
+        self.clf = LogisticRegression(max_iter=500) # default classifier
+        self.df = df
+        self.categories = self.df.drop(columns = ['id', 'message', 'original', 'genre'])
+        self.category_names = self.categories.columns.values
+        # divide input and output data
+        self.x, self.y = self.df['message'].to_numpy(), self.categories.to_numpy()
 
 
-
-def evaluate_model(model, X_test, Y_test, category_names):
-    '''
-    INPUT
-    model pipeline built using build_model() method and fitted using the training data. 
-    X_test, Y_test, category_names
+    # def load_data(self, df):
+    #     categories = df.drop(columns = ['id', 'message', 'original', 'genre'])
+    #     x, y = df['message'].to_numpy(), categories.to_numpy()
     
+    #     return train_test_split(x, y, test_size = 0.3, shuffle = True, random_state=0)
 
-    OUTPUT
-    The jaccard_score calculated using sample averages
-    '''
-    from sklearn.metrics import jaccard_score
-    from sklearn.metrics import classification_report
+    # def load_data(self, df):
+    #     '''
+    #     INPUT
+    #     pandas DataFrame
+
+    #     OUTPUT
+    #     splitted test and training data
+    #     '''
+
+    #     self.df = df
+    #     self.categories = self.df.drop(columns = ['id', 'message', 'original', 'genre'])
+    #     self.category_names = self.categories.columns.values
+
+    #     # partition input and output data
+    #     self.x, self.y = self.df['message'].to_numpy(), self.categories.to_numpy()
+        
+    #     return train_test_split(self.x, self.y, test_size = 0.2, shuffle = True, random_state=0)
+
+    def build_model(self):
+        '''
+        INPUT:
+        None
+
+        OUTPUT:
+        a ML pipeline by first transforming 
+        the text data to TF-IDF matrix then follows a multilabel classifier
+        '''
+        # build pipeline
+        self.pipe = Pipeline([
+        ('tfidf_vect', TfidfVectorizer(tokenizer = tokenize)),
+        ('clf', OneVsRestClassifier(self.clf))])
+
+        return self.pipe
     
-    y_pred = model.predict(X_test)   
-    # calculate jaccard_score, which is a good measure for the multilabel classification problem
-    ovr_jaccard_score = jaccard_score(Y_test, y_pred, average='samples')
-   
-    report = classification_report(Y_test, y_pred, target_names=category_names, output_dict=True, zero_division=0)
-    # convert the report to pandas DataFrame
-    report = pd.DataFrame(report).transpose()
-    # save the evaluation metrics to the csv file
-    report.to_csv('data/performance_evaluation.csv')
+    def fit(self, split = 0.2):
+        '''
+        INPUT:
+        None
 
-    return ovr_jaccard_score
+        OUTPUT:
+        None
 
+        fit the model using training data
+        '''
+        self.split = split
+        self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(self.x, self.y, test_size = self.split, shuffle = True, random_state=0)
+        self.model = self.build_model()
+        self.model.fit(self.x_train, self.y_train)
+
+    def evaluate(self):
+        '''
+        INPUT:
+        None
+
+        OUTPUT:
+        jaccard_score, it is a good performance measure of multilabel tasks
+        '''
+        self.y_pred = self.model.predict(self.x_test)
+        self.jaccard_score = jaccard_score(self.y_test, self.y_pred, average='samples')
+        report = classification_report(self.y_test, self.y_pred, target_names = self.category_names, output_dict=True, zero_division = 0)
+        self.report = pd.DataFrame(report).transpose()
+        
+        print('The Jaccard score on the test data set is: {}'.format(self.jaccard_score))
+                   
     
+    def plot_dist(self):
+        '''
+        INPUT:
+        None
 
-def save_model(model, model_filepath):
-    '''
-    INPUT
-    model: model fitted using the training dataset
-    model_filepath: filepath to save the model
-    OUTPUT
-    None
-    '''
-    # import pickle
-    # with open(model_filepath, 'wb') as f:
-    #     pickle.dump(model, f)
-    from joblib import dump
-    dump(model, '{}'.format(model_filepath)) 
+        OUTPUT:
+        a plot of Distribution of Category Labels
+        '''
+        cats = list(range(self.categories.shape[1])) # replace the name of categories into numbers
+        counts = self.categories.sum().values
+        sns.set(font_scale = 2)
+        plt.figure(figsize=(16,9))
+        ax= sns.barplot(cats, counts)
+        plt.title("Distribution of Category Labels", fontsize=24)
+        plt.ylabel('Number of Messages', fontsize=18)
+        plt.xlabel('Message Labels', fontsize=18)
+        #adding the text labels
+        rects = ax.patches
+        for rect, count in zip(rects, counts):
+            height = rect.get_height()
+            ax.text(rect.get_x() + rect.get_width()/2, height + 5, count, ha='center', va='bottom', fontsize=12)
+        
+        plt.show()
 
+
+    def save(self, model_filepath):
+        '''
+        INPUT
+        model_filepath: filepath to save the model
+        OUTPUT
+        None
+
+        save the trained model
+        '''        
+        dump(self.model, '{}'.format(model_filepath)) 
     
-# def warn(*args, **kwargs):
-#     pass
-# import warnings
-# warnings.warn = warn
+    
+    def __repr__(self):
+    
+        """Function to output the characteristics of the model
+        
+        Args:
+            None
+        
+        Returns:
+            string: characteristics of the model
+        
+        """
+        
+        return "A multilabel machine learning model using {} as the classifier".format(self.clf)
 
+from sqlalchemy import create_engine
+class data_process():
+    '''
+    This class serves to load the data from a SQL database, 
+    and optionally upsample the data with under-represented 
+    categories to improve the model performance.
+    '''
+    def __init__(self, sample = True, threshold = 0.05):
+        '''
+        INPUT: 
+        threshold: parameters for deciding the least popular message labels
+        sample: if to up-sample data or not
+        
+        OUTPUT:
+        None
+        '''
+        self.sample = sample
+        self.threshold = threshold
+
+
+    def load_data(self, database_filepath):
+        '''
+        INPUT       
+        database_filepath: filepath of the SQL database
+
+        OUTPUT
+        splitted test and training data
+        '''
+        # load data from the SQL database        
+        engine = create_engine('sqlite:///{}'.format(database_filepath))
+        self.df = pd.read_sql("SELECT * FROM RawDataClean", engine)
+        engine.dispose()
+
+        if self.sample:
+            return self.up_sample()            
+        else:
+            return self.df
+                          
+                             
+    def up_sample(self):
+        '''
+        INPUT:
+        None
+
+        OUTPUT:
+        dataframe upsampled using the more sophiscated method described in the notebook
+        '''
+        sub_cats = self.df[self.df['related'] == 1].drop(columns = ['id', 'message', 'original', 'genre', 'related'])
+        # counts how many labels per category
+        label_counts = sub_cats.sum().values
+        # choose the boostrap sampling number equal to the most popular label
+        self.upsample_num = np.sort(label_counts)[::-1][0]
+        # choose the most 3 popular categories
+        self.pop_label = list(sub_cats.sum().sort_values(ascending = False)[:3].index) 
+
+        # messages without any label in the most popular categories 
+        sparse_msg = sub_cats[~sub_cats[self.pop_label].any(axis = 1)]
+        # avoid messages with 'related' = 1 and rest = 0
+        msg_to_sample = sparse_msg[(sparse_msg.sum(axis = 1) > 0)]
+        # upsampling 
+        msg_up_sample = msg_to_sample.sample(n = self.upsample_num, replace = True, random_state = 0)
+        self.df_sample = pd.concat([self.df.loc[msg_up_sample.index], self.df.loc[list(set(self.df.index.values) - set(msg_to_sample.index.values))]])
+
+        return self.df_sample    
+        
 
 def main():
     if len(sys.argv) == 3:
-        database_filepath, model_filepath = sys.argv[1:]
+        database_filepath, model_filepath = sys.argv[1:]     
         print('Loading data...\n    DATABASE: {}'.format(database_filepath))
-        X, Y, category_names = load_data(database_filepath)
-        X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2)
-
+        data = data_process()
+        df = data.load_data(database_filepath)   
+       
         print('Building model...')
-        model = build_model()
+        model = ML_classifier(df)
+        model.build_model()
         
         print('Training model...')
-        model.fit(X_train, Y_train)
+        model.fit()
         
         print('Evaluating model...')
-        evaluate_model(model, X_test, Y_test, category_names)
+        model.evaluate()
 
         print('Saving model...\n    MODEL: {}'.format(model_filepath))
-        save_model(model, model_filepath)
+        model.save(model_filepath)
 
         print('Trained model saved!')
 
