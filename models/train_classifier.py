@@ -2,6 +2,7 @@ import sys
 import pandas as pd
 import numpy as np
 
+
 # load NLP related modules and files
 import nltk
 from nltk.tokenize import word_tokenize
@@ -45,42 +46,25 @@ from sklearn.multiclass import OneVsRestClassifier
 from sklearn.metrics import jaccard_score
 from sklearn.metrics import classification_report
 from joblib import dump
-
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 class ML_classifier():
 
     def __init__(self, df):
+        '''
+        INPUT:
+        df: the dataframe for our modeling
+        
+        OUTPUT:
+        None
+        '''
         self.clf = LogisticRegression(max_iter=500) # default classifier
         self.df = df
         self.categories = self.df.drop(columns = ['id', 'message', 'original', 'genre'])
         self.category_names = self.categories.columns.values
         # divide input and output data
         self.x, self.y = self.df['message'].to_numpy(), self.categories.to_numpy()
-
-
-    # def load_data(self, df):
-    #     categories = df.drop(columns = ['id', 'message', 'original', 'genre'])
-    #     x, y = df['message'].to_numpy(), categories.to_numpy()
-    
-    #     return train_test_split(x, y, test_size = 0.3, shuffle = True, random_state=0)
-
-    # def load_data(self, df):
-    #     '''
-    #     INPUT
-    #     pandas DataFrame
-
-    #     OUTPUT
-    #     splitted test and training data
-    #     '''
-
-    #     self.df = df
-    #     self.categories = self.df.drop(columns = ['id', 'message', 'original', 'genre'])
-    #     self.category_names = self.categories.columns.values
-
-    #     # partition input and output data
-    #     self.x, self.y = self.df['message'].to_numpy(), self.categories.to_numpy()
-        
-    #     return train_test_split(self.x, self.y, test_size = 0.2, shuffle = True, random_state=0)
 
     def build_model(self):
         '''
@@ -170,15 +154,16 @@ class ML_classifier():
     
         """Function to output the characteristics of the model
         
-        Args:
-            None
+        INPUT:
+        None
         
-        Returns:
-            string: characteristics of the model
+        OUTPUT:
+        string: characteristics of the model
         
         """
         
         return "A multilabel machine learning model using {} as the classifier".format(self.clf)
+
 
 from sqlalchemy import create_engine
 class data_process():
@@ -187,18 +172,15 @@ class data_process():
     and optionally upsample the data with under-represented 
     categories to improve the model performance.
     '''
-    def __init__(self, sample = True, threshold = 0.05):
+    def __init__(self, sample = True):
         '''
-        INPUT: 
-        threshold: parameters for deciding the least popular message labels
-        sample: if to up-sample data or not
+        INPUT:  
+        sample: whether or not to up-sample the data
         
         OUTPUT:
         None
         '''
         self.sample = sample
-        self.threshold = threshold
-
 
     def load_data(self, database_filepath):
         '''
@@ -208,7 +190,7 @@ class data_process():
         OUTPUT
         splitted test and training data
         '''
-        # load data from the SQL database        
+        # load data from the SQL database     
         engine = create_engine('sqlite:///{}'.format(database_filepath))
         self.df = pd.read_sql("SELECT * FROM RawDataClean", engine)
         engine.dispose()

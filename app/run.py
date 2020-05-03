@@ -79,7 +79,8 @@ def index():
             'data': [
                 Bar(
                     x=label_cats,
-                    y=label_counts
+                    y=label_counts,
+                    marker_color='lightsalmon'
                 )
             ],
 
@@ -97,7 +98,8 @@ def index():
      'data': [
                 Bar(
                     x=multi_labels,
-                    y=multi_label_counts
+                    y=multi_label_counts,
+                    marker_color='indianred'
                 )
             ],
 
