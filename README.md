@@ -18,16 +18,17 @@ After building and training such a model, we can next launch a web app which wil
     - To run ML pipeline that trains classifier and saves
         `python models/train_classifier.py data/DisasterResponse.db models/classifier.pkl`
 
-2. Run the following command in the app's directory to run the web app.
+2. Run the following command in the app's directory to run the web app
     `python run.py`
 
 3. Go to http://0.0.0.0:3001/ to use the web app to query your own message and see some visualizations about the original dataset.
 
+4. If you are curious about the details of data processing and machine learning model building, you can check two jupyter notebooks in the main directory.
 
 ### Requirements
 
 * *Python 3.5+*
-* *NLTK* for NLP (converting text data into numerical data)
+* *NLTK* for natural language processing (converting text data into numerical data)
 * *Pandas, Numpy, scikit-learn, sqlalchemy* for data processing and machine learning
-* *Matplotlib, seaborn, plotly* data visualizations
+* *Matplotlib, seaborn, plotly*  for data visualizations
 * *Flask*, back-end of our minimalistic web app
