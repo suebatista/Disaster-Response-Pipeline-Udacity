@@ -6,10 +6,17 @@ The dataset (in the data folder) comes from [appen](https://appen.com) which con
 
 Our goal here is to build a machine learning model to identify if these messages are related to disaster or not, and further label the nature of these messages. This would be of great help for some disaster relief agencies. We have 36 labels for these messages in total. Note, however, these labels are not mutually exclusive. Hence it is a multi-label classification problem.
 
-After building and training such a model, we can next launch a web app which will label any new messages.
+The most obvious feature of those data messages is they are highly imbalanced. 
+Several categories getting very few labels. To improve the accuracy, we implement a up-sample
+scheme before training. 
+
+After building and training such a model, we can next launch a web service which can label new messages from users' input.
 
 
 ### Instructions:
+
+
+
 1. Run the following commands in the project's root directory to set up the database and model.
 
     - To run ETL pipeline that cleans data and stores in database
@@ -17,6 +24,7 @@ After building and training such a model, we can next launch a web app which wil
 
     - To run ML pipeline that trains classifier and saves
         `python models/train_classifier.py data/DisasterResponse.db models/classifier.pkl`
+      Note by default the data will be up-sampled before training. You can change this setting in the train_classifier.py by setting `data_process(sample = False)` when instantiating the data loading class. It should take less than a minute to train and save the model.
 
 2. Run the following command in the app's directory to run the web app
     `python run.py`
@@ -24,6 +32,7 @@ After building and training such a model, we can next launch a web app which wil
 3. Go to http://0.0.0.0:3001/ to use the web app to query your own message and see some visualizations about the original dataset.
 
 4. If you are curious about the details of data processing and machine learning model building, you can check two jupyter notebooks in the main directory.
+
 
 ### Requirements
 
