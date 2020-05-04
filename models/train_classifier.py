@@ -45,26 +45,33 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.metrics import jaccard_score
 from sklearn.metrics import classification_report
+from sklearn.model_selection import GridSearchCV
 from joblib import dump
 import seaborn as sns
 import matplotlib.pyplot as plt
+from tempfile import mkdtemp
+from shutil import rmtree
 
 class ML_classifier():
 
-    def __init__(self, df):
+    def __init__(self, df, split = 0.2):
         '''
         INPUT:
         df: the dataframe for our modeling
+        split: ratio of the test set over the entire set
         
         OUTPUT:
         None
         '''
         self.clf = LogisticRegression(max_iter=500) # default classifier
         self.df = df
+        self.split = split
         self.categories = self.df.drop(columns = ['id', 'message', 'original', 'genre'])
         self.category_names = self.categories.columns.values
         # divide input and output data
         self.x, self.y = self.df['message'].to_numpy(), self.categories.to_numpy()
+        self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(self.x, self.y, test_size = self.split, shuffle = True, random_state=0)
+
 
     def build_model(self):
         '''
@@ -75,14 +82,52 @@ class ML_classifier():
         a ML pipeline by first transforming 
         the text data to TF-IDF matrix then follows a multilabel classifier
         '''
+        self.cachedir = mkdtemp() # build a temp dir to store the transformer result
+
         # build pipeline
         self.pipe = Pipeline([
         ('tfidf_vect', TfidfVectorizer(tokenizer = tokenize)),
-        ('clf', OneVsRestClassifier(self.clf))])
+        ('clf', OneVsRestClassifier(self.clf))], memory=self.cachedir)
 
         return self.pipe
+
+    def grid_search(self):
+        '''
+        Perform grid search over a set of parameters to improve the model accuracy
+
+        INPUT: 
+        None
+
+        OUTPUT:
+        None
+        '''    
+        model = self.build_model()
+        parameters = {
+            'tfidf_vect__max_df': (0.75, 1.0),
+            #'tfidf_vect__max_features': (None, 5000, 10000),
+            'tfidf_vect__ngram_range': ((1, 1), (1, 2)),  # unigrams or bigrams
+            'clf__estimator__max_iter': (100, 500), 
+            'clf__estimator__C': (0.1, 1.0, 10, 100),
+            }
+
+        grid_search = GridSearchCV(model, parameters, scoring = 'f1_samples', n_jobs=-1, verbose=1)
+        grid_search.fit(self.x_train, self.y_train)
+        self.best_parameters = grid_search.best_estimator_.get_params()
+                
+        # after grid search, update the model with new parameters
+        self.pipe = Pipeline([
+            ('tfidf_vect', self.best_parameters['tfidf_vect']),
+            ('clf', self.best_parameters['clf']),
+            ])
+
+        for param_name in sorted(parameters.keys()):
+            print("\t%s: %r" % (param_name, self.best_parameters[param_name]))
+
+        # remove temp files after search
+        rmtree(self.cachedir)
+
     
-    def fit(self, split = 0.2):
+    def fit(self):
         '''
         INPUT:
         None
@@ -91,12 +136,11 @@ class ML_classifier():
         None
 
         fit the model using training data
-        '''
-        self.split = split
-        self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(self.x, self.y, test_size = self.split, shuffle = True, random_state=0)
+        '''     
         self.model = self.build_model()
         self.model.fit(self.x_train, self.y_train)
 
+    
     def evaluate(self):
         '''
         INPUT:
