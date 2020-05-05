@@ -63,7 +63,7 @@ class ML_classifier():
         OUTPUT:
         None
         '''
-        self.clf = LogisticRegression(max_iter=500) # default classifier
+        self.clf = LogisticRegression(max_iter=500, class_weight = 'balanced') # default classifier
         self.df = df
         self.split = split
         self.categories = self.df.drop(columns = ['id', 'message', 'original', 'genre'])
@@ -110,7 +110,7 @@ class ML_classifier():
             'clf__estimator__C': (0.1, 1.0, 10, 100),
             }
 
-        grid_search = GridSearchCV(model, parameters, scoring = 'f1_samples', n_jobs=-1, verbose=1)
+        grid_search = GridSearchCV(model, parameters, n_jobs=-1, verbose=1)
         grid_search.fit(self.x_train, self.y_train)
         self.best_parameters = grid_search.best_estimator_.get_params()
                 
