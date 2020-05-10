@@ -24,7 +24,7 @@ After building and training such a model, we can next launch a web service which
 
     - To run ML pipeline that trains classifier and saves
         `python models/train_classifier.py data/DisasterResponse.db models/classifier.pkl`
-      Note by default the data will be up-sampled before training. You can change this setting in the train_classifier.py by setting `data_process(sample = False)` when instantiating the data loading class. It should take less than a minute to train and save the model.
+      Note by default the training data will be up-sampled before training. You can change this setting in the train_classifier.py by setting `ML_classifier(df, sample = False)` when instantiating the ML model class. It should take less than a minute to train and save the model.
 
 2. Run the following command in the app's directory to run the web app
     `python run.py`
