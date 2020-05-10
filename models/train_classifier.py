@@ -54,11 +54,12 @@ from shutil import rmtree
 
 class ML_classifier():
 
-    def __init__(self, df, split = 0.2):
+    def __init__(self, df, upsample = True, split = 0.7):
         '''
         INPUT:
         df: the dataframe for our modeling
-        split: ratio of the test set over the entire set
+        split: ratio of the train set over the entire set
+        upsample: determine whether to upsample the training set
         
         OUTPUT:
         None
@@ -66,12 +67,57 @@ class ML_classifier():
         self.clf = LogisticRegression(max_iter=500, class_weight = 'balanced') # default classifier
         self.df = df
         self.split = split
+        self.upsample = upsample
+        if self.upsample:
+            self.up_sample()
+        else:
+            self.categories = self.df.drop(columns = ['id', 'message', 'original', 'genre'])
+            self.category_names = self.categories.columns.values
+            # divide input and output data
+            x, y = self.df['message'].to_numpy(), self.categories.to_numpy()
+            self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(x, y, test_size = 1 - self.split, shuffle = True, random_state=0)
+
+
+    def up_sample(self):
+        '''
+        Upsample under-represented messages in the training dataset
+        INPUT:
+        None
+
+        OUTPUT:
+        None
+        '''
+        self.df = self.df.sample(frac = 1, random_state = 0) # random shuffle df
+        # self.df = self.df.reset_index()
+        df_train, df_test = self.df.iloc[:int(self.split*len(self.df))], self.df.iloc[int(self.split*len(self.df)):]
+        sub_cats = df_train[df_train['related'] == 1].drop(columns = ['id', 'message', 'original', 'genre', 'related'])
+        
+        # counts how many labels per category
+        label_counts = sub_cats.sum().values
+        # choose the boostrap sampling number equal to the most popular label
+        self.upsample_num = np.sort(label_counts)[::-1][0]
+        # choose the most 3 popular categories
+        pop_label = list(sub_cats.sum().sort_values(ascending = False)[:3].index) 
+
+        ## messages without any label in the most popular categories 
+        sparse_msg = sub_cats[~sub_cats[pop_label].any(axis = 1)]
+        # avoid messages with 'related' = 1 and rest = 0
+        msg_to_sample = sparse_msg[(sparse_msg.sum(axis = 1) > 0)]
+        # upsampling rare messages
+        msg_up_sample = msg_to_sample.sample(n = self.upsample_num, replace = True, random_state = 0)
+        # combine the sampled with unsampled
+        df_train_sample = pd.concat([df_train.loc[msg_up_sample.index], df_train.loc[list(set(df_train.index.values) - set(msg_to_sample.index.values))]])
+        
+
+        ## divide train, test dataset
+        categories_train_sample = df_train_sample.drop(columns = ['id', 'message', 'original', 'genre'])
+        categories_test = df_test.drop(columns = ['id', 'message', 'original', 'genre'])
+        self.df = pd.concat([df_train_sample, df_test])
         self.categories = self.df.drop(columns = ['id', 'message', 'original', 'genre'])
         self.category_names = self.categories.columns.values
-        # divide input and output data
-        self.x, self.y = self.df['message'].to_numpy(), self.categories.to_numpy()
-        self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(self.x, self.y, test_size = self.split, shuffle = True, random_state=0)
-
+        self.x_train, self.y_train = df_train_sample['message'].to_numpy(), categories_train_sample.to_numpy()
+        self.x_test, self.y_test = df_test['message'].to_numpy(), categories_test.to_numpy()
+      
 
     def build_model(self):
         '''
@@ -91,6 +137,7 @@ class ML_classifier():
 
         return self.pipe
 
+    
     def grid_search(self):
         '''
         Perform grid search over a set of parameters to improve the model accuracy
@@ -196,7 +243,7 @@ class ML_classifier():
     
     def __repr__(self):
     
-        """Function to output the characteristics of the model
+        '''Function to output the characteristics of the model
         
         INPUT:
         None
@@ -204,27 +251,23 @@ class ML_classifier():
         OUTPUT:
         string: characteristics of the model
         
-        """
+        '''
         
         return "A multilabel machine learning model using {} as the classifier".format(self.clf)
 
 
 from sqlalchemy import create_engine
-class data_process():
+class Data_Process():
     '''
     This class serves to load the data from a SQL database, 
-    and optionally upsample the data with under-represented 
-    categories to improve the model performance.
     '''
-    def __init__(self, sample = True):
+    def __init__(self):
         '''
         INPUT:  
-        sample: whether or not to up-sample the data
-        
+        None        
         OUTPUT:
         None
         '''
-        self.sample = sample
 
     def load_data(self, database_filepath):
         '''
@@ -238,45 +281,15 @@ class data_process():
         engine = create_engine('sqlite:///{}'.format(database_filepath))
         self.df = pd.read_sql("SELECT * FROM RawDataClean", engine)
         engine.dispose()
+        return self.df
 
-        if self.sample:
-            return self.up_sample()            
-        else:
-            return self.df
-                          
-                             
-    def up_sample(self):
-        '''
-        INPUT:
-        None
-
-        OUTPUT:
-        dataframe upsampled using the more sophiscated method described in the notebook
-        '''
-        sub_cats = self.df[self.df['related'] == 1].drop(columns = ['id', 'message', 'original', 'genre', 'related'])
-        # counts how many labels per category
-        label_counts = sub_cats.sum().values
-        # choose the boostrap sampling number equal to the most popular label
-        self.upsample_num = np.sort(label_counts)[::-1][0]
-        # choose the most 3 popular categories
-        self.pop_label = list(sub_cats.sum().sort_values(ascending = False)[:3].index) 
-
-        # messages without any label in the most popular categories 
-        sparse_msg = sub_cats[~sub_cats[self.pop_label].any(axis = 1)]
-        # avoid messages with 'related' = 1 and rest = 0
-        msg_to_sample = sparse_msg[(sparse_msg.sum(axis = 1) > 0)]
-        # upsampling 
-        msg_up_sample = msg_to_sample.sample(n = self.upsample_num, replace = True, random_state = 0)
-        self.df_sample = pd.concat([self.df.loc[msg_up_sample.index], self.df.loc[list(set(self.df.index.values) - set(msg_to_sample.index.values))]])
-
-        return self.df_sample    
         
 
 def main():
     if len(sys.argv) == 3:
         database_filepath, model_filepath = sys.argv[1:]     
         print('Loading data...\n    DATABASE: {}'.format(database_filepath))
-        data = data_process()
+        data = Data_Process()
         df = data.load_data(database_filepath)   
        
         print('Building model...')
